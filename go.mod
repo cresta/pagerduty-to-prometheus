@@ -10,5 +10,6 @@ require (
 	github.com/cresta/zapctx v0.0.1
 	github.com/gorilla/mux v1.8.0
 	github.com/signalfx/golib/v3 v3.3.34
+	github.com/stretchr/testify v1.7.0
 	go.uber.org/zap v1.17.0
 )
