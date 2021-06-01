@@ -24,6 +24,7 @@ RUN mage go:build
 RUN mkdir /empty_dir
 
 FROM scratch
+LABEL org.opencontainers.image.source=https://github.com/cresta/pagerduty-to-prometheus
 # Import from builder.
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /etc/passwd /etc/passwd
