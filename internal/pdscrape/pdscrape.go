@@ -4,26 +4,27 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/PagerDuty/go-pagerduty"
-	"github.com/cresta/zapctx"
-	"go.uber.org/zap"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/PagerDuty/go-pagerduty"
+	"github.com/cresta/zapctx"
+	"go.uber.org/zap"
 )
 
 type PdScrape struct {
-	Client *pagerduty.Client
-	Log *zapctx.Logger
+	Client           *pagerduty.Client
+	Log              *zapctx.Logger
 	LookbackDuration time.Duration
-	k knownIncidents
-	s knownServices
-	lastSyncTime atomicTime
+	k                knownIncidents
+	s                knownServices
+	lastSyncTime     atomicTime
 }
 
 type atomicTime struct {
-	t time.Time
+	t  time.Time
 	mu sync.Mutex
 }
 
@@ -75,9 +76,9 @@ func (p *PdScrape) refreshIncidentsWithSort(ctx context.Context, sortBy string, 
 	for {
 		inc, err := p.Client.ListIncidentsWithContext(ctx, pagerduty.ListIncidentsOptions{
 			APIListObject: prev,
-			Since: startTime,
-			Statuses: status,
-			SortBy: sortBy,
+			Since:         startTime,
+			Statuses:      status,
+			SortBy:        sortBy,
 		})
 		if err != nil {
 			return fmt.Errorf("unable to list more incidents: %w", err)
@@ -147,7 +148,7 @@ func (p *PdScrape) Availabilities(ctx context.Context, lookback time.Duration) (
 		l.Info(ctx, "on service")
 		oneDayRange := timeRange{
 			start: currentTime.Add(-lookback),
-			end: currentTime,
+			end:   currentTime,
 		}
 		avail := rangeList{ranges: []timeRange{oneDayRange}}
 		l.Info(ctx, "incidents for service", zap.Int("len", len(byRange[s.ID])))
@@ -162,9 +163,9 @@ func (p *PdScrape) Availabilities(ctx context.Context, lookback time.Duration) (
 }
 
 type IncidentCounts struct {
-	Triggered int
+	Triggered    int
 	Acknowledged int
-	Resolved int
+	Resolved     int
 }
 
 func (p *PdScrape) IncidentCounts(ctx context.Context, lookback time.Duration) (map[string]IncidentCounts, error) {
@@ -202,7 +203,7 @@ func (p *PdScrape) IncidentCounts(ctx context.Context, lookback time.Duration) (
 
 type knownIncidents struct {
 	incidentById map[string]pagerduty.Incident
-	mu sync.Mutex
+	mu           sync.Mutex
 }
 
 func (k *knownIncidents) allRangesByService(currentTime time.Time) (map[string][]incidentRange, error) {
@@ -239,7 +240,7 @@ func (k *knownIncidents) addIncident(i pagerduty.Incident) bool {
 
 type timeRange struct {
 	start time.Time
-	end time.Time
+	end   time.Time
 }
 
 func (t *timeRange) String() string {
@@ -356,7 +357,7 @@ func rangeFromIncident(i pagerduty.Incident, currentTime time.Time) (incidentRan
 }
 
 type knownServices struct {
-	s []pagerduty.Service
+	s  []pagerduty.Service
 	mu sync.Mutex
 }
 

@@ -3,6 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/http"
+	"os"
+
 	"github.com/cresta/gotracing"
 	"github.com/cresta/gotracing/datadog"
 	"github.com/cresta/httpsimple"
@@ -11,17 +15,14 @@ import (
 	"github.com/signalfx/golib/v3/httpdebug"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"net"
-	"net/http"
-	"os"
 )
 
 type config struct {
-	ListenAddr                      string
-	DebugListenAddr                 string
-	Tracer                          string
-	PagerDutyToken                  string
-	LogLevel                        string
+	ListenAddr      string
+	DebugListenAddr string
+	Tracer          string
+	PagerDutyToken  string
+	LogLevel        string
 }
 
 func (c config) WithDefaults() config {
@@ -56,12 +57,12 @@ func main() {
 }
 
 type Service struct {
-	osExit       func(int)
-	config       config
-	log          *zapctx.Logger
-	onListen     func(net.Listener)
-	server       *http.Server
-	tracers      *gotracing.Registry
+	osExit   func(int)
+	config   config
+	log      *zapctx.Logger
+	onListen func(net.Listener)
+	server   *http.Server
+	tracers  *gotracing.Registry
 }
 
 var instance = Service{

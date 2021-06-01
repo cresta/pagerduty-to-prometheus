@@ -2,11 +2,12 @@ package pdscrape
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/cresta/zapctx/testhelp/testhelp"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"testing"
-	"time"
 )
 
 func TestPdScrape(t *testing.T) {
@@ -16,10 +17,10 @@ func TestPdScrape(t *testing.T) {
 	ctx := context.Background()
 	require.NoError(t, x.Init(ctx, ""))
 	require.NoError(t, x.Scrape(ctx))
-	av, err := x.Availabilities(ctx, time.Hour * 24)
+	av, err := x.Availabilities(ctx, time.Hour*24)
 	require.NoError(t, err)
 	x.Log.Warn(ctx, "avails are ", zap.Any("av", av))
-	ic, err := x.IncidentCounts(ctx, time.Hour * 24)
+	ic, err := x.IncidentCounts(ctx, time.Hour*24)
 	require.NoError(t, err)
 	x.Log.Warn(ctx, "counts are", zap.Any("ic", ic))
 }
@@ -31,7 +32,7 @@ func TestTimeRange(t *testing.T) {
 		return func(t *testing.T) {
 			tr := timeRange{
 				start: start,
-				end: end,
+				end:   end,
 			}
 			r := rangeList{
 				ranges: []timeRange{tr},
@@ -51,7 +52,7 @@ func TestTimeRange(t *testing.T) {
 	}}, 0, 0))
 	t.Run("no remove", doTest([]timeRange{{
 		start: end.Add(time.Minute),
-		end:   end.Add(time.Minute*2),
+		end:   end.Add(time.Minute * 2),
 	}}, time.Hour, 1))
 	t.Run("no remove start", doTest([]timeRange{{
 		start: start.Add(-time.Minute * 2),
@@ -60,7 +61,7 @@ func TestTimeRange(t *testing.T) {
 	t.Run("Split", doTest([]timeRange{{
 		start: start,
 		end:   start.Add(time.Minute),
-	}}, time.Minute * 59, 2))
+	}}, time.Minute*59, 2))
 	t.Run("Split twice", doTest([]timeRange{
 		{
 			start: start.Add(time.Minute),
@@ -69,7 +70,7 @@ func TestTimeRange(t *testing.T) {
 			start: start.Add(time.Minute * 4),
 			end:   start.Add(time.Minute * 6),
 		},
-	}, time.Minute * 55, 2))
+	}, time.Minute*55, 2))
 	t.Run("Split ends", doTest([]timeRange{
 		{
 			start: start.Add(-time.Minute),
@@ -78,5 +79,5 @@ func TestTimeRange(t *testing.T) {
 			start: end.Add(-time.Minute * 5),
 			end:   end.Add(time.Minute),
 		},
-	}, time.Minute * 50, 1))
+	}, time.Minute*50, 1))
 }
