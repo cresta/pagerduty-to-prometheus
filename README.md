@@ -59,6 +59,7 @@ pdcollector_incidents_status_amount{id="YYYYYY",service="gateway",status="trigge
 
 We publish docker images via github container repository.  Do not use the images
 with `cache` in their name as they are build caches.  Instead, use the versioned images.
+The full list of deployed images [are here](https://github.com/orgs/cresta/packages/container/package/pagerduty-to-prometheus).
 
 For example:
 ```
