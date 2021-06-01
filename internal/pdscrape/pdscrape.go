@@ -32,7 +32,7 @@ func (p *PdScrape) CreateGather(timeRange time.Duration) prometheus.Gatherer {
 			Subsystem: "incidents",
 			Name:      "free_percent",
 			Help:      "% time [0-1] of no incidents in this timerange",
-		}, []string{"service", "timerange", "id"})
+		}, []string{"service", "timerange", "id", "team"})
 		scrapeAge := prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: "pdcollector",
 			Subsystem: "scrape",
@@ -44,23 +44,23 @@ func (p *PdScrape) CreateGather(timeRange time.Duration) prometheus.Gatherer {
 			Subsystem: "incidents",
 			Name:      "status_amount",
 			Help:      "# of incidents in this timerange by their current status",
-		}, []string{"service", "timerange", "id", "status"})
+		}, []string{"service", "timerange", "id", "status", "team"})
 		ctx := context.Background()
 		vals, err := p.Availabilities(ctx, timeRange)
 		if err != nil {
 			return nil, fmt.Errorf("unable to fetch availabilities: %w", err)
 		}
 		for s, v := range vals {
-			percentFree.WithLabelValues(p.s.nameForID(s), timeRange.String(), s).Set(float64(v) / float64(time.Hour*24))
+			percentFree.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, p.s.teamForId(s)).Set(float64(v) / float64(time.Hour*24))
 		}
 		counts, err := p.IncidentCounts(ctx, timeRange)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get incident counts: %w", err)
 		}
 		for s, c := range counts {
-			incidentCounts.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, "triggered").Set(float64(c.Triggered))
-			incidentCounts.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, "acknowledged").Set(float64(c.Acknowledged))
-			incidentCounts.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, "resolved").Set(float64(c.Resolved))
+			incidentCounts.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, "triggered", p.s.teamForId(s)).Set(float64(c.Triggered))
+			incidentCounts.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, "acknowledged", p.s.teamForId(s)).Set(float64(c.Acknowledged))
+			incidentCounts.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, "resolved", p.s.teamForId(s)).Set(float64(c.Resolved))
 		}
 		scrapeAge.Set(time.Since(p.lastSyncTime.get()).Seconds())
 		r := prometheus.NewRegistry()
@@ -171,7 +171,9 @@ func (p *PdScrape) refreshIncidents(ctx context.Context, currentTime time.Time) 
 func (p *PdScrape) Scrape(ctx context.Context) error {
 	currentTime := time.Now().UTC()
 	p.Log.Info(ctx, "Listing services")
-	services, err := p.Client.ListServicesPaginated(ctx, pagerduty.ListServiceOptions{})
+	services, err := p.Client.ListServicesPaginated(ctx, pagerduty.ListServiceOptions{
+		Includes: []string{"teams"},
+	})
 	if err != nil {
 		return fmt.Errorf("unable to list services: %w", err)
 	}
@@ -419,6 +421,21 @@ func (k *knownServices) nameForID(id string) string {
 	for _, s := range k.s {
 		if s.ID == id {
 			return s.Name
+		}
+	}
+	return ""
+}
+
+func (k *knownServices) teamForId(id string) string {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	for _, s := range k.s {
+		if s.ID == id {
+			if len(s.Teams) > 0 {
+				// Note: Only one team supported.  What would multiple teams look like in /metrics?
+				return s.Teams[0].Name
+			}
+			return ""
 		}
 	}
 	return ""
