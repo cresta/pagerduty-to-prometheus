@@ -51,16 +51,16 @@ func (p *PdScrape) CreateGather(timeRange time.Duration) prometheus.Gatherer {
 			return nil, fmt.Errorf("unable to fetch availabilities: %w", err)
 		}
 		for s, v := range vals {
-			percentFree.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, p.s.teamForId(s)).Set(float64(v) / float64(time.Hour*24))
+			percentFree.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, p.s.teamForID(s)).Set(float64(v) / float64(time.Hour*24))
 		}
 		counts, err := p.IncidentCounts(ctx, timeRange)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get incident counts: %w", err)
 		}
 		for s, c := range counts {
-			incidentCounts.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, "triggered", p.s.teamForId(s)).Set(float64(c.Triggered))
-			incidentCounts.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, "acknowledged", p.s.teamForId(s)).Set(float64(c.Acknowledged))
-			incidentCounts.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, "resolved", p.s.teamForId(s)).Set(float64(c.Resolved))
+			incidentCounts.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, "triggered", p.s.teamForID(s)).Set(float64(c.Triggered))
+			incidentCounts.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, "acknowledged", p.s.teamForID(s)).Set(float64(c.Acknowledged))
+			incidentCounts.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, "resolved", p.s.teamForID(s)).Set(float64(c.Resolved))
 		}
 		scrapeAge.Set(time.Since(p.lastSyncTime.get()).Seconds())
 		r := prometheus.NewRegistry()
@@ -426,7 +426,7 @@ func (k *knownServices) nameForID(id string) string {
 	return ""
 }
 
-func (k *knownServices) teamForId(id string) string {
+func (k *knownServices) teamForID(id string) string {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	for _, s := range k.s {
