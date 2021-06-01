@@ -103,9 +103,6 @@ func (p *PdScrape) lookbackDuration() time.Duration {
 
 func (p *PdScrape) Init(ctx context.Context, token string) error {
 	if token == "" {
-		token = os.Getenv("PAGERDUTY_TOKEN")
-	}
-	if token == "" {
 		return errors.New("please set pagerduty token")
 	}
 	p.Client = pagerduty.NewClient(token)
