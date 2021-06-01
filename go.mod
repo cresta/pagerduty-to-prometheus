@@ -12,4 +12,5 @@ require (
 	github.com/signalfx/golib/v3 v3.3.34
 	github.com/stretchr/testify v1.7.0
 	go.uber.org/zap v1.17.0
+	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 )
