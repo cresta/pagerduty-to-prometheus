@@ -28,13 +28,13 @@ podAnnotations: {}
 podSecurityContext: {}
   # fsGroup: 2000
 
-pd: {}
+pd:
   # envSecrets: secret-path
   # logLevel: info
   # lookbackDuration: 168h
   # availabilityWindow: 24h
   # refreshInterval: 1m
-  # token: xyz123
+  token: y_NbAkKc66ryYTWUXYEu # This is the test token from PD
   # tracer: datadog
 
 securityContext: {}
