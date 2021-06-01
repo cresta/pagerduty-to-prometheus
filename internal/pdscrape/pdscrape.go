@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_model/go"
-	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	io_prometheus_client "github.com/prometheus/client_model/go"
 
 	"github.com/PagerDuty/go-pagerduty"
 	"github.com/cresta/zapctx"
@@ -26,24 +26,24 @@ type PdScrape struct {
 }
 
 func (p *PdScrape) CreateGather(timeRange time.Duration) prometheus.Gatherer {
-	return prometheus.GathererFunc(func()([]*io_prometheus_client.MetricFamily, error) {
+	return prometheus.GathererFunc(func() ([]*io_prometheus_client.MetricFamily, error) {
 		percentFree := prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: "pdcollector",
 			Subsystem: "incidents",
-			Name: "free_percent",
-			Help: "% time [0-1] of no incidents in this timerange",
+			Name:      "free_percent",
+			Help:      "% time [0-1] of no incidents in this timerange",
 		}, []string{"service", "timerange", "id"})
 		scrapeAge := prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: "pdcollector",
 			Subsystem: "scrape",
-			Name: "age_seconds",
-			Help: "How long ago the last scraped occurred",
+			Name:      "age_seconds",
+			Help:      "How long ago the last scraped occurred",
 		})
 		incidentCounts := prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: "pdcollector",
 			Subsystem: "incidents",
-			Name: "status_amount",
-			Help: "# of incidents in this timerange by their current status",
+			Name:      "status_amount",
+			Help:      "# of incidents in this timerange by their current status",
 		}, []string{"service", "timerange", "id", "status"})
 		ctx := context.Background()
 		vals, err := p.Availabilities(ctx, timeRange)
@@ -51,7 +51,7 @@ func (p *PdScrape) CreateGather(timeRange time.Duration) prometheus.Gatherer {
 			return nil, fmt.Errorf("unable to fetch availabilities: %w", err)
 		}
 		for s, v := range vals {
-			percentFree.WithLabelValues(p.s.nameForId(s), timeRange.String(), s).Set(float64(v) / float64(time.Hour * 24))
+			percentFree.WithLabelValues(p.s.nameForId(s), timeRange.String(), s).Set(float64(v) / float64(time.Hour*24))
 		}
 		counts, err := p.IncidentCounts(ctx, timeRange)
 		if err != nil {

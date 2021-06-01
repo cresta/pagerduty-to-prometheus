@@ -3,12 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/cresta/pagerduty-to-prometheus/internal/pdscrape"
 	"net"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/cresta/pagerduty-to-prometheus/internal/pdscrape"
 
 	"github.com/cresta/gotracing"
 	"github.com/cresta/gotracing/datadog"
@@ -62,12 +63,12 @@ func getConfig() config {
 		// Defaults to ":6060"
 		DebugListenAddr: os.Getenv("DEBUG_ADDR"),
 		// Allows you to use a dynamic tracer
-		Tracer:           os.Getenv("TRACER"),
-		PagerDutyToken:   os.Getenv("PAGERDUTY_TOKEN"),
-		LogLevel:         os.Getenv("LOG_LEVEL"),
-		LookbackDuration: mustParseDuration("LOOKBACK_DURATION"),
+		Tracer:             os.Getenv("TRACER"),
+		PagerDutyToken:     os.Getenv("PAGERDUTY_TOKEN"),
+		LogLevel:           os.Getenv("LOG_LEVEL"),
+		LookbackDuration:   mustParseDuration("LOOKBACK_DURATION"),
 		AvailabilityWindow: mustParseDuration("AVAILABILITY_WINDOW"),
-		RefreshInterval:  mustParseDuration("REFRESH_INTERVAL"),
+		RefreshInterval:    mustParseDuration("REFRESH_INTERVAL"),
 	}.WithDefaults()
 }
 
@@ -165,9 +166,9 @@ func (m *Service) Main() {
 		ctx := context.Background()
 		for {
 			select {
-			case <- onClose:
+			case <-onClose:
 				return
-			case <- time.After(m.config.RefreshInterval):
+			case <-time.After(m.config.RefreshInterval):
 				if err := m.pdScrape.Scrape(ctx); err != nil {
 					m.log.IfErr(err).Error(ctx, "unable to scrape for more metrics")
 				} else {
@@ -188,7 +189,7 @@ func (m *Service) Main() {
 func hidePasswords(c config) config {
 	ret := c
 	if len(ret.PagerDutyToken) > 4 {
-		ret.PagerDutyToken = ret.PagerDutyToken[0:4] + strings.Repeat("*", len(ret.PagerDutyToken) - 4)
+		ret.PagerDutyToken = ret.PagerDutyToken[0:4] + strings.Repeat("*", len(ret.PagerDutyToken)-4)
 	}
 	return ret
 }
