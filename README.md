@@ -29,6 +29,12 @@ It also reports all incidents that are currently in their ack or open
 status, as well as all "resolved" (in the past 24 hours) incidents and
 exports those.
 
+## Setup
+
+The service requires an environment variable PAGERDUTY_TOKEN to run.  You can
+get this token [from PagerDuty](https://developer.pagerduty.com/docs/rest-api-v2/authentication/).
+
+
 ## Example metrics
 
 In the example below, the `redis` service has had an active incident the entire 24 hour period, so it
@@ -47,6 +53,16 @@ pdcollector_incidents_status_amount{id="XXXXXX",service="redis",status="triggere
 pdcollector_incidents_status_amount{id="YYYYYY",service="gateway",status="acknowledged",team="frontend",timerange="24h0m0s"} 0
 pdcollector_incidents_status_amount{id="YYYYYY",service="gateway",status="resolved",team="frontend",timerange="24h0m0s"} 7
 pdcollector_incidents_status_amount{id="YYYYYY",service="gateway",status="triggered",team="frontend",timerange="24h0m0s"} 1
+```
+
+## Docker images
+
+We publish docker images via github container repository.  Do not use the images
+with `cache` in their name as they are build caches.  Instead, use the versioned images.
+
+For example:
+```
+docker pull ghcr.io/cresta/pagerduty-to-prometheus:0.1.2
 ```
 
 ## Helm chart
@@ -85,4 +101,28 @@ spec:
     pd:
       logLevel: info
       envSecrets: secret-env
+```
+
+# Development
+
+You'll need the environment variable PAGERDUTY_TOKEN to run the service.  After
+placing it in your environment you can do the following.  For testing and
+linting, you'll need to [install mage](https://magefile.org/).
+
+## Running
+
+```
+go run ./cmd/pagerduty-to-prometheus/main.go
+```
+
+## Testing
+
+```
+mage go:test
+```
+
+## Linting
+
+```
+mage go:lint
 ```
