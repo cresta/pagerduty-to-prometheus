@@ -31,7 +31,7 @@ exports those.
 
 ## Example metrics
 
-In the example below, the `redis` service has an an active incident the entire 24 hour period, so it
+In the example below, the `redis` service has had an active incident the entire 24 hour period, so it
 has had 0% `incidents_free_percent`, while `gateway` had only a short incident
 
 ```
