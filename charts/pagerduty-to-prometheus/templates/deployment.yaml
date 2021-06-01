@@ -5,9 +5,7 @@ metadata:
   labels:
     {{- include "pagerduty-to-prometheus.labels" . | nindent 4 }}
 spec:
-  {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
-  {{- end }}
   selector:
     matchLabels:
       {{- include "pagerduty-to-prometheus.selectorLabels" . | nindent 6 }}
@@ -33,17 +31,47 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.pd.envSecrets }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.pd.envSecrets }}
+          {{- end }}
+          env:
+            {{- if .Values.pd.logLevel }}
+            - name: LOG_LEVEL
+              value: {{ .Values.pd.logLevel | quote }}
+            {{- end }}
+            {{- if .Values.pd.lookbackDuration }}
+            - name: LOOKBACK_DURATION
+              value: {{ .Values.pd.lookbackDuration | quote }}
+            {{- end }}
+            {{- if .Values.pd.availabilityWindow }}
+            - name: AVAILABILITY_WINDOW
+              value: {{ .Values.pd.availabilityWindow | quote }}
+            {{- end }}
+            {{- if .Values.pd.refreshInterval }}
+            - name: REFRESH_INTERVAL
+              value: {{ .Values.pd.refreshInterval | quote }}
+            {{- end }}
+            {{- if .Values.pd.token }}
+            - name: PAGERDUTY_TOKEN
+              value: {{ .Values.pd.token | quote }}
+            {{- end }}
+            {{- if .Values.pd.tracer }}
+            - name: TRACER
+              value: {{ .Values.pd.tracer | quote }}
+            {{- end }}
           ports:
             - name: http
-              containerPort: 80
+              containerPort: 8080
               protocol: TCP
           livenessProbe:
             httpGet:
-              path: /
+              path: /health
               port: http
           readinessProbe:
             httpGet:
-              path: /
+              path: /health
               port: http
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
