@@ -3,26 +3,33 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/cresta/pagerduty-to-prometheus/internal/pdscrape"
 	"net"
 	"net/http"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/cresta/gotracing"
 	"github.com/cresta/gotracing/datadog"
 	"github.com/cresta/httpsimple"
 	"github.com/cresta/zapctx"
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/signalfx/golib/v3/httpdebug"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
 type config struct {
-	ListenAddr      string
-	DebugListenAddr string
-	Tracer          string
-	PagerDutyToken  string
-	LogLevel        string
+	ListenAddr         string
+	DebugListenAddr    string
+	Tracer             string
+	PagerDutyToken     string
+	LogLevel           string
+	LookbackDuration   time.Duration
+	RefreshInterval    time.Duration
+	AvailabilityWindow time.Duration
 }
 
 func (c config) WithDefaults() config {
@@ -35,6 +42,16 @@ func (c config) WithDefaults() config {
 	if c.LogLevel == "" {
 		c.LogLevel = "INFO"
 	}
+	if c.LookbackDuration == 0 {
+		// 1 week
+		c.LookbackDuration = time.Hour * 24 * 7
+	}
+	if c.RefreshInterval == 0 {
+		c.RefreshInterval = time.Minute
+	}
+	if c.AvailabilityWindow == 0 {
+		c.AvailabilityWindow = time.Hour * 24
+	}
 	return c
 }
 
@@ -45,11 +62,25 @@ func getConfig() config {
 		// Defaults to ":6060"
 		DebugListenAddr: os.Getenv("DEBUG_ADDR"),
 		// Allows you to use a dynamic tracer
-		Tracer: os.Getenv("TRACER"),
-		// Allows you to use a dynamic tracer
-		PagerDutyToken: os.Getenv("PAGERDUTY_TOKEN"),
-		LogLevel:       os.Getenv("LOG_LEVEL"),
+		Tracer:           os.Getenv("TRACER"),
+		PagerDutyToken:   os.Getenv("PAGERDUTY_TOKEN"),
+		LogLevel:         os.Getenv("LOG_LEVEL"),
+		LookbackDuration: mustParseDuration("LOOKBACK_DURATION"),
+		AvailabilityWindow: mustParseDuration("AVAILABILITY_WINDOW"),
+		RefreshInterval:  mustParseDuration("REFRESH_INTERVAL"),
 	}.WithDefaults()
+}
+
+func mustParseDuration(d string) time.Duration {
+	if os.Getenv(d) == "" {
+		return 0
+	}
+	ret, err := time.ParseDuration(os.Getenv(d))
+	if err != nil {
+		fmt.Println("Unable to parse duration env variable " + d + " of `" + os.Getenv(d) + "`")
+		panic(err)
+	}
+	return ret
 }
 
 func main() {
@@ -63,6 +94,7 @@ type Service struct {
 	onListen func(net.Listener)
 	server   *http.Server
 	tracers  *gotracing.Registry
+	pdScrape *pdscrape.PdScrape
 }
 
 var instance = Service{
@@ -102,7 +134,7 @@ func (m *Service) Main() {
 			return
 		}
 	}
-	m.log.Info(context.Background(), "Starting", zap.Any("config", m.config))
+	m.log.Info(context.Background(), "Starting", zap.Any("config", hidePasswords(m.config)))
 	rootTracer, err := m.tracers.New(m.config.Tracer, gotracing.Config{
 		Log: m.log.With(zap.String("section", "setup_tracing")),
 		Env: os.Environ(),
@@ -128,7 +160,24 @@ func (m *Service) Main() {
 		m.osExit(1)
 		return
 	}
+	onClose := make(chan struct{})
+	go func() {
+		ctx := context.Background()
+		for {
+			select {
+			case <- onClose:
+				return
+			case <- time.After(m.config.RefreshInterval):
+				if err := m.pdScrape.Scrape(ctx); err != nil {
+					m.log.IfErr(err).Error(ctx, "unable to scrape for more metrics")
+				} else {
+					m.log.Debug(ctx, "scrape complete")
+				}
+			}
+		}
+	}()
 	serveErr := httpsimple.BasicServerRun(m.log, m.server, m.onListen, m.config.ListenAddr)
+	close(onClose)
 
 	shutdownCallback()
 	if serveErr != nil {
@@ -136,13 +185,34 @@ func (m *Service) Main() {
 	}
 }
 
+func hidePasswords(c config) config {
+	ret := c
+	if len(ret.PagerDutyToken) > 4 {
+		ret.PagerDutyToken = ret.PagerDutyToken[0:4] + strings.Repeat("*", len(ret.PagerDutyToken) - 4)
+	}
+	return ret
+}
+
 func (m *Service) injection(ctx context.Context) error {
+	m.pdScrape = &pdscrape.PdScrape{
+		Log:              m.log.With(zap.String("class", "pdscrape")),
+		LookbackDuration: m.config.LookbackDuration,
+	}
+	if err := m.pdScrape.Init(ctx, m.config.PagerDutyToken); err != nil {
+		return fmt.Errorf("unable to init service: %w", err)
+	}
+	if err := m.pdScrape.Scrape(ctx); err != nil {
+		return fmt.Errorf("unable to do startup scrape: %w", err)
+	}
 	return nil
 }
 
 func (m *Service) setupServer(cfg config, log *zapctx.Logger, tracer gotracing.Tracing) *http.Server {
 	rootHandler := mux.NewRouter()
 	rootHandler.Handle("/health", httpsimple.HealthHandler(log, tracer))
+	rootHandler.Handle("/metrics", promhttp.HandlerFor(m.pdScrape.CreateGather(m.config.AvailabilityWindow), promhttp.HandlerOpts{
+		EnableOpenMetrics: true,
+	}))
 	return &http.Server{
 		Addr:    cfg.ListenAddr,
 		Handler: rootHandler,

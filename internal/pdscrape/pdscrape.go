@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_model/go"
 	"os"
 	"strings"
 	"sync"
@@ -21,6 +23,58 @@ type PdScrape struct {
 	k                knownIncidents
 	s                knownServices
 	lastSyncTime     atomicTime
+}
+
+func (p *PdScrape) CreateGather(timeRange time.Duration) prometheus.Gatherer {
+	return prometheus.GathererFunc(func()([]*io_prometheus_client.MetricFamily, error) {
+		percentFree := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: "pdcollector",
+			Subsystem: "incidents",
+			Name: "free_percent",
+			Help: "% time [0-1] of no incidents in this timerange",
+		}, []string{"service", "timerange", "id"})
+		scrapeAge := prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: "pdcollector",
+			Subsystem: "scrape",
+			Name: "age_seconds",
+			Help: "How long ago the last scraped occurred",
+		})
+		incidentCounts := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: "pdcollector",
+			Subsystem: "incidents",
+			Name: "status_amount",
+			Help: "# of incidents in this timerange by their current status",
+		}, []string{"service", "timerange", "id", "status"})
+		ctx := context.Background()
+		vals, err := p.Availabilities(ctx, timeRange)
+		if err != nil {
+			return nil, fmt.Errorf("unable to fetch availabilities: %w", err)
+		}
+		for s, v := range vals {
+			percentFree.WithLabelValues(p.s.nameForId(s), timeRange.String(), s).Set(float64(v) / float64(time.Hour * 24))
+		}
+		counts, err := p.IncidentCounts(ctx, timeRange)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get incident counts: %w", err)
+		}
+		for s, c := range counts {
+			incidentCounts.WithLabelValues(p.s.nameForId(s), timeRange.String(), s, "triggered").Set(float64(c.Triggered))
+			incidentCounts.WithLabelValues(p.s.nameForId(s), timeRange.String(), s, "acknowledged").Set(float64(c.Acknowledged))
+			incidentCounts.WithLabelValues(p.s.nameForId(s), timeRange.String(), s, "resolved").Set(float64(c.Resolved))
+		}
+		scrapeAge.Set(time.Since(p.lastSyncTime.get()).Seconds())
+		r := prometheus.NewRegistry()
+		if err := r.Register(percentFree); err != nil {
+			return nil, fmt.Errorf("unable to register collector percent_free: %w", err)
+		}
+		if err := r.Register(incidentCounts); err != nil {
+			return nil, fmt.Errorf("unable to register collector incident_counts: %w", err)
+		}
+		if err := r.Register(scrapeAge); err != nil {
+			return nil, fmt.Errorf("unable to register collector scrape_age: %w", err)
+		}
+		return r.Gather()
+	})
 }
 
 type atomicTime struct {
@@ -135,28 +189,28 @@ func (p *PdScrape) Scrape(ctx context.Context) error {
 }
 
 func (p *PdScrape) Availabilities(ctx context.Context, lookback time.Duration) (map[string]time.Duration, error) {
-	p.Log.Info(ctx, "got incs", zap.Int("len", len(p.k.incidentById)))
+	p.Log.Debug(ctx, "got incs", zap.Int("len", len(p.k.incidentById)))
 	currentTime := p.lastSyncTime.get()
 	byRange, err := p.k.allRangesByService(currentTime)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create all service ranges: %w", err)
 	}
-	p.Log.Info(ctx, "got ranges", zap.Int("len", len(byRange)))
+	p.Log.Debug(ctx, "got ranges", zap.Int("len", len(byRange)))
 	ret := make(map[string]time.Duration)
 	for _, s := range p.s.get() {
 		l := p.Log.With(zap.String("service", s.Name), zap.String("service_id", s.ID))
-		l.Info(ctx, "on service")
+		l.Debug(ctx, "on service")
 		oneDayRange := timeRange{
 			start: currentTime.Add(-lookback),
 			end:   currentTime,
 		}
 		avail := rangeList{ranges: []timeRange{oneDayRange}}
-		l.Info(ctx, "incidents for service", zap.Int("len", len(byRange[s.ID])))
+		l.Debug(ctx, "incidents for service", zap.Int("len", len(byRange[s.ID])))
 		for _, inc := range byRange[s.ID] {
 			avail.sub(inc.timeRange)
 		}
 		totalAvail := avail.totalTime()
-		l.Info(ctx, "total availability past 24 hours", zap.Duration("time", totalAvail))
+		l.Debug(ctx, "total availability past 24 hours", zap.Duration("time", totalAvail))
 		ret[s.ID] = totalAvail
 	}
 	return ret, nil
@@ -169,13 +223,13 @@ type IncidentCounts struct {
 }
 
 func (p *PdScrape) IncidentCounts(ctx context.Context, lookback time.Duration) (map[string]IncidentCounts, error) {
-	p.Log.Info(ctx, "got incs", zap.Int("len", len(p.k.incidentById)))
+	p.Log.Debug(ctx, "got incs", zap.Int("len", len(p.k.incidentById)))
 	currentTime := p.lastSyncTime.get()
 	byRange, err := p.k.allRangesByService(currentTime)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create all service ranges: %w", err)
 	}
-	p.Log.Info(ctx, "got ranges", zap.Int("len", len(byRange)))
+	p.Log.Debug(ctx, "got ranges", zap.Int("len", len(byRange)))
 	ret := make(map[string]IncidentCounts)
 	for _, s := range p.s.get() {
 		var ic IncidentCounts
@@ -359,6 +413,17 @@ func rangeFromIncident(i pagerduty.Incident, currentTime time.Time) (incidentRan
 type knownServices struct {
 	s  []pagerduty.Service
 	mu sync.Mutex
+}
+
+func (k *knownServices) nameForId(id string) string {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	for _, s := range k.s {
+		if s.ID == id {
+			return s.Name
+		}
+	}
+	return ""
 }
 
 func (k *knownServices) set(s []pagerduty.Service) {
