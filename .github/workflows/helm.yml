@@ -29,11 +29,6 @@ jobs:
         uses: helm/kind-action@v1.0.0
       - name: Install helm chart
         run:  helm install pagerduty-to-prometheus ./charts/pagerduty-to-prometheus
-      - name: Wait for deployment to finish
-        timeout-minutes: 1
-        run:  kubectl rollout status --watch deployment/pagerduty-to-prometheus
-      - name: Test helm chart
-        run:  helm test pagerduty-to-prometheus
       - name: Remove helm chart
         run:  helm uninstall pagerduty-to-prometheus
       - name: Run chart-releaser
