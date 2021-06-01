@@ -51,16 +51,16 @@ func (p *PdScrape) CreateGather(timeRange time.Duration) prometheus.Gatherer {
 			return nil, fmt.Errorf("unable to fetch availabilities: %w", err)
 		}
 		for s, v := range vals {
-			percentFree.WithLabelValues(p.s.nameForId(s), timeRange.String(), s).Set(float64(v) / float64(time.Hour*24))
+			percentFree.WithLabelValues(p.s.nameForID(s), timeRange.String(), s).Set(float64(v) / float64(time.Hour*24))
 		}
 		counts, err := p.IncidentCounts(ctx, timeRange)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get incident counts: %w", err)
 		}
 		for s, c := range counts {
-			incidentCounts.WithLabelValues(p.s.nameForId(s), timeRange.String(), s, "triggered").Set(float64(c.Triggered))
-			incidentCounts.WithLabelValues(p.s.nameForId(s), timeRange.String(), s, "acknowledged").Set(float64(c.Acknowledged))
-			incidentCounts.WithLabelValues(p.s.nameForId(s), timeRange.String(), s, "resolved").Set(float64(c.Resolved))
+			incidentCounts.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, "triggered").Set(float64(c.Triggered))
+			incidentCounts.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, "acknowledged").Set(float64(c.Acknowledged))
+			incidentCounts.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, "resolved").Set(float64(c.Resolved))
 		}
 		scrapeAge.Set(time.Since(p.lastSyncTime.get()).Seconds())
 		r := prometheus.NewRegistry()
@@ -186,7 +186,7 @@ func (p *PdScrape) Scrape(ctx context.Context) error {
 }
 
 func (p *PdScrape) Availabilities(ctx context.Context, lookback time.Duration) (map[string]time.Duration, error) {
-	p.Log.Debug(ctx, "got incs", zap.Int("len", len(p.k.incidentById)))
+	p.Log.Debug(ctx, "got incs", zap.Int("len", len(p.k.incidentByID)))
 	currentTime := p.lastSyncTime.get()
 	byRange, err := p.k.allRangesByService(currentTime)
 	if err != nil {
@@ -220,7 +220,7 @@ type IncidentCounts struct {
 }
 
 func (p *PdScrape) IncidentCounts(ctx context.Context, lookback time.Duration) (map[string]IncidentCounts, error) {
-	p.Log.Debug(ctx, "got incs", zap.Int("len", len(p.k.incidentById)))
+	p.Log.Debug(ctx, "got incs", zap.Int("len", len(p.k.incidentByID)))
 	currentTime := p.lastSyncTime.get()
 	byRange, err := p.k.allRangesByService(currentTime)
 	if err != nil {
@@ -231,11 +231,12 @@ func (p *PdScrape) IncidentCounts(ctx context.Context, lookback time.Duration) (
 	for _, s := range p.s.get() {
 		var ic IncidentCounts
 		for _, inc := range byRange[s.ID] {
-			if inc.inc.Status == "triggered" {
+			switch inc.inc.Status {
+			case "triggered":
 				ic.Triggered++
-			} else if inc.inc.Status == "acknowledged" {
+			case "acknowledged":
 				ic.Acknowledged++
-			} else if inc.inc.Status == "resolved" {
+			case "resolved":
 				statChange, err := time.Parse(time.RFC3339, inc.inc.LastStatusChangeAt)
 				if err != nil {
 					return nil, fmt.Errorf("unable to parse last status change for incident %s of %s: %w", inc.inc.Id, inc.inc.LastStatusChangeAt, err)
@@ -243,7 +244,7 @@ func (p *PdScrape) IncidentCounts(ctx context.Context, lookback time.Duration) (
 				if statChange.Add(lookback).After(currentTime) {
 					ic.Resolved++
 				}
-			} else {
+			default:
 				return nil, fmt.Errorf("invalid incident status for %s of %s", inc.inc.Id, inc.inc.Status)
 			}
 		}
@@ -253,7 +254,7 @@ func (p *PdScrape) IncidentCounts(ctx context.Context, lookback time.Duration) (
 }
 
 type knownIncidents struct {
-	incidentById map[string]pagerduty.Incident
+	incidentByID map[string]pagerduty.Incident
 	mu           sync.Mutex
 }
 
@@ -261,7 +262,7 @@ func (k *knownIncidents) allRangesByService(currentTime time.Time) (map[string][
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	ret := make(map[string][]incidentRange)
-	for _, i := range k.incidentById {
+	for _, i := range k.incidentByID {
 		ir, err := rangeFromIncident(i, currentTime)
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse incident %s: %w", i.Id, err)
@@ -275,17 +276,17 @@ func (k *knownIncidents) allRangesByService(currentTime time.Time) (map[string][
 func (k *knownIncidents) addIncident(i pagerduty.Incident) bool {
 	k.mu.Lock()
 	defer k.mu.Unlock()
-	if k.incidentById == nil {
-		k.incidentById = make(map[string]pagerduty.Incident)
+	if k.incidentByID == nil {
+		k.incidentByID = make(map[string]pagerduty.Incident)
 	}
-	if _, exists := k.incidentById[i.Id]; !exists {
-		k.incidentById[i.Id] = i
+	if _, exists := k.incidentByID[i.Id]; !exists {
+		k.incidentByID[i.Id] = i
 		return false
 	}
-	if k.incidentById[i.Id].LastStatusChangeAt == i.LastStatusChangeAt {
+	if k.incidentByID[i.Id].LastStatusChangeAt == i.LastStatusChangeAt {
 		return true
 	}
-	k.incidentById[i.Id] = i
+	k.incidentByID[i.Id] = i
 	return false
 }
 
@@ -314,7 +315,7 @@ func (t *rangeList) totalTime() time.Duration {
 }
 
 func (t *rangeList) String() string {
-	var p []string
+	p := make([]string, 0, len(t.ranges))
 	for _, r := range t.ranges {
 		p = append(p, r.String())
 	}
@@ -412,7 +413,7 @@ type knownServices struct {
 	mu sync.Mutex
 }
 
-func (k *knownServices) nameForId(id string) string {
+func (k *knownServices) nameForID(id string) string {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	for _, s := range k.s {
