@@ -3,6 +3,16 @@ entries:
   pagerduty-to-prometheus:
   - apiVersion: v2
     appVersion: 0.1.2
+    created: "2021-06-01T05:59:53.178337519Z"
+    description: A Helm chart for Kubernetes
+    digest: 61e6fac3bc29187b41cf3fc1ea01c248d71ce0883e5dc70260180946d4d8cb1f
+    name: pagerduty-to-prometheus
+    type: application
+    urls:
+    - https://github.com/cresta/pagerduty-to-prometheus/releases/download/pagerduty-to-prometheus-0.1.5/pagerduty-to-prometheus-0.1.5.tgz
+    version: 0.1.5
+  - apiVersion: v2
+    appVersion: 0.1.2
     created: "2021-06-01T05:51:49.587872452Z"
     description: A Helm chart for Kubernetes
     digest: 879970f13e2c8784599150df0a559f91dab446ecdc7064a8001e6f2e257799ee
