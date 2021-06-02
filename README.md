@@ -2,6 +2,9 @@
 
 Exports pagerduty incident stats as prometheus metrics.
 
+![image](https://user-images.githubusercontent.com/20358/120554683-e34afb80-c3ae-11eb-8619-d9f607643220.png)
+
+
 ## Problem to solve
 
 We have lots of services.  Each services gets alerts routed to it via PagerDuty
