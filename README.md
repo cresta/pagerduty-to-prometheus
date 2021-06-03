@@ -2,8 +2,7 @@
 
 Exports pagerduty incident stats as prometheus metrics.
 
-![image](https://user-images.githubusercontent.com/20358/120554683-e34afb80-c3ae-11eb-8619-d9f607643220.png)
-
+![image](https://user-images.githubusercontent.com/20358/120691401-45613a80-c45b-11eb-90a0-e0bb5d8b7175.png)
 
 ## Problem to solve
 
