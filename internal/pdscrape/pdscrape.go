@@ -28,6 +28,18 @@ type PdScrape struct {
 	lastSyncTime     atomicTime
 }
 
+type IncidentStatus string
+
+const (
+	triggered    = IncidentStatus("triggered")
+	acknowledged = IncidentStatus("acknowledged")
+	resolved     = IncidentStatus("resolved")
+)
+
+func (i IncidentStatus) String() string {
+	return string(i)
+}
+
 func (p *PdScrape) CreateGather(timeRange time.Duration) prometheus.Gatherer {
 	return prometheus.GathererFunc(func() ([]*io_prometheus_client.MetricFamily, error) {
 		percentFree := prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -67,18 +79,18 @@ func (p *PdScrape) CreateGather(timeRange time.Duration) prometheus.Gatherer {
 			return nil, fmt.Errorf("unable to get incident counts: %w", err)
 		}
 		for s, c := range counts {
-			incidentCountsByService.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, "triggered", p.s.teamForID(s)).Set(float64(c.Triggered))
-			incidentCountsByService.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, "acknowledged", p.s.teamForID(s)).Set(float64(c.Acknowledged))
-			incidentCountsByService.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, "resolved", p.s.teamForID(s)).Set(float64(c.Resolved))
+			incidentCountsByService.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, triggered.String(), p.s.teamForID(s)).Set(float64(c.Triggered))
+			incidentCountsByService.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, acknowledged.String(), p.s.teamForID(s)).Set(float64(c.Acknowledged))
+			incidentCountsByService.WithLabelValues(p.s.nameForID(s), timeRange.String(), s, resolved.String(), p.s.teamForID(s)).Set(float64(c.Resolved))
 		}
 		escCounts, err := p.IncidentCountsByEscalationTeam(ctx, timeRange)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get incident counts by escalation: %w", err)
 		}
 		for s, c := range escCounts {
-			incidentCountsByEscalation.WithLabelValues(s.ID, timeRange.String(), "triggered", s.TeamName, s.EscalationName).Set(float64(c.Triggered))
-			incidentCountsByEscalation.WithLabelValues(s.ID, timeRange.String(), "acknowledged", s.TeamName, s.EscalationName).Set(float64(c.Acknowledged))
-			incidentCountsByEscalation.WithLabelValues(s.ID, timeRange.String(), "resolved", s.TeamName, s.EscalationName).Set(float64(c.Resolved))
+			incidentCountsByEscalation.WithLabelValues(s.ID, timeRange.String(), triggered.String(), s.TeamName, s.EscalationName).Set(float64(c.Triggered))
+			incidentCountsByEscalation.WithLabelValues(s.ID, timeRange.String(), acknowledged.String(), s.TeamName, s.EscalationName).Set(float64(c.Acknowledged))
+			incidentCountsByEscalation.WithLabelValues(s.ID, timeRange.String(), resolved.String(), s.TeamName, s.EscalationName).Set(float64(c.Resolved))
 		}
 		scrapeAge.Set(time.Since(p.lastSyncTime.get()).Seconds())
 		r := prometheus.NewRegistry()
@@ -176,14 +188,14 @@ func (p *PdScrape) refreshIncidents(ctx context.Context, currentTime time.Time) 
 	//       We will need to update this if they add more status codes.
 	//
 	// Insert even old events, if they are active
-	if err := p.refreshIncidentsWithSort(ctx, "created_at:desc", currentTime, []string{"triggered", "acknowledged"}, 0); err != nil {
+	if err := p.refreshIncidentsWithSort(ctx, "created_at:desc", currentTime, []string{triggered.String(), acknowledged.String()}, 0); err != nil {
 		return fmt.Errorf("unable to refresh incidents by created_at: %w", err)
 	}
 	// Insert recent events that are resolved
-	if err := p.refreshIncidentsWithSort(ctx, "created_at:desc", currentTime, []string{"resolved"}, p.lookbackDuration()); err != nil {
+	if err := p.refreshIncidentsWithSort(ctx, "created_at:desc", currentTime, []string{resolved.String()}, p.lookbackDuration()); err != nil {
 		return fmt.Errorf("unable to refresh incidents by created_at: %w", err)
 	}
-	if err := p.refreshIncidentsWithSort(ctx, "resolved_at:desc", currentTime, []string{"resolved"}, p.lookbackDuration()); err != nil {
+	if err := p.refreshIncidentsWithSort(ctx, "resolved_at:desc", currentTime, []string{resolved.String()}, p.lookbackDuration()); err != nil {
 		return fmt.Errorf("unable to refresh incidents by updated_at: %w", err)
 	}
 	return nil
@@ -273,11 +285,11 @@ func (p *PdScrape) IncidentCountsByEscalationTeam(ctx context.Context, lookback 
 		var ic IncidentCounts
 		for _, inc := range byRange[e.ID] {
 			switch inc.inc.Status {
-			case "triggered":
+			case triggered.String():
 				ic.Triggered++
-			case "acknowledged":
+			case acknowledged.String():
 				ic.Acknowledged++
-			case "resolved":
+			case resolved.String():
 				statChange, err := time.Parse(time.RFC3339, inc.inc.LastStatusChangeAt)
 				if err != nil {
 					return nil, fmt.Errorf("unable to parse last status change for incident %s of %s: %w", inc.inc.Id, inc.inc.LastStatusChangeAt, err)
@@ -319,11 +331,11 @@ func (p *PdScrape) IncidentCounts(ctx context.Context, lookback time.Duration) (
 		var ic IncidentCounts
 		for _, inc := range byRange[s.ID] {
 			switch inc.inc.Status {
-			case "triggered":
+			case triggered.String():
 				ic.Triggered++
-			case "acknowledged":
+			case acknowledged.String():
 				ic.Acknowledged++
-			case "resolved":
+			case resolved.String():
 				statChange, err := time.Parse(time.RFC3339, inc.inc.LastStatusChangeAt)
 				if err != nil {
 					return nil, fmt.Errorf("unable to parse last status change for incident %s of %s: %w", inc.inc.Id, inc.inc.LastStatusChangeAt, err)
@@ -542,7 +554,7 @@ func rangeFromIncident(i pagerduty.Incident, currentTime time.Time) (incidentRan
 	if err != nil {
 		return incidentRange{}, fmt.Errorf("unable to parse end time %s: %w", i.LastStatusChangeAt, err)
 	}
-	if i.Status != "resolved" {
+	if i.Status != resolved.String() {
 		endTime = currentTime
 	}
 	return incidentRange{
@@ -602,21 +614,6 @@ type knownEscalations struct {
 	mu sync.Mutex
 }
 
-func (k *knownEscalations) teamForID(id string) string {
-	k.mu.Lock()
-	defer k.mu.Unlock()
-	for _, s := range k.s {
-		if s.ID == id {
-			if len(s.Teams) > 0 {
-				// Note: Only one team supported.  What would multiple teams look like in /metrics?
-				return s.Teams[0].ID
-			}
-			return ""
-		}
-	}
-	return ""
-}
-
 func (k *knownEscalations) set(s []pagerduty.EscalationPolicy) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
@@ -649,10 +646,4 @@ func (k *knownTeams) set(s []pagerduty.Team) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	k.s = s
-}
-
-func (k *knownTeams) get() []pagerduty.Team {
-	k.mu.Lock()
-	defer k.mu.Unlock()
-	return k.s
 }
