@@ -40,21 +40,25 @@ get this token [from PagerDuty](https://developer.pagerduty.com/docs/rest-api-v2
 ## Example metrics
 
 In the example below, the `redis` service has had an active incident the entire 24 hour period, so it
-has had 0% `incidents_free_percent`, while `gateway` had only a short incident
+has had 0% `incidents_free_percent`.
 
 ```
+# HELP pdcollector_incidents_escalation_status_amount # of incidents in this timerange by their current status where ownership is the current incident escalation policy
+# TYPE pdcollector_incidents_escalation_status_amount gauge
+pdcollector_incidents_escalation_status_amount{escalation="Default escalation for infra",id="PJXP8NP",status="acknowledged",team="infra",timerange="24h0m0s"} 0
+pdcollector_incidents_escalation_status_amount{escalation="Default escalation for infra",id="PJXP8NP",status="resolved",team="infra",timerange="24h0m0s"} 30
+pdcollector_incidents_escalation_status_amount{escalation="Default escalation for infra",id="PJXP8NP",status="triggered",team="infra",timerange="24h0m0s"} 11
 # HELP pdcollector_incidents_free_percent % time [0-1] of no incidents in this timerange
 # TYPE pdcollector_incidents_free_percent gauge
-pdcollector_incidents_free_percent{id="XXXXXX",service="redis",team="infra",timerange="24h0m0s"} 0
-pdcollector_incidents_free_percent{id="YYYYYY",service="gateway",team="frontend",timerange="24h0m0s"} 0.9664720202523148
-# HELP pdcollector_incidents_status_amount # of incidents in this timerange by their current status
-# TYPE pdcollector_incidents_status_amount gauge
-pdcollector_incidents_status_amount{id="XXXXXX",service="redis",status="acknowledged",team="infra",timerange="24h0m0s"} 0
-pdcollector_incidents_status_amount{id="XXXXXX",service="redis",status="resolved",team="infra",timerange="24h0m0s"} 7
-pdcollector_incidents_status_amount{id="XXXXXX",service="redis",status="triggered",team="infra",timerange="24h0m0s"} 14
-pdcollector_incidents_status_amount{id="YYYYYY",service="gateway",status="acknowledged",team="frontend",timerange="24h0m0s"} 0
-pdcollector_incidents_status_amount{id="YYYYYY",service="gateway",status="resolved",team="frontend",timerange="24h0m0s"} 7
-pdcollector_incidents_status_amount{id="YYYYYY",service="gateway",status="triggered",team="frontend",timerange="24h0m0s"} 1
+pdcollector_incidents_free_percent{id="P5VMHYN",service="redis",team="infra",timerange="24h0m0s"} 0
+# HELP pdcollector_incidents_service_status_amount # of incidents in this timerange by their current status, where team ownership is who owns the service
+# TYPE pdcollector_incidents_service_status_amount gauge
+pdcollector_incidents_service_status_amount{id="P5VMHYN",service="redis",status="acknowledged",team="infra",timerange="24h0m0s"} 0
+pdcollector_incidents_service_status_amount{id="P5VMHYN",service="redis",status="resolved",team="infra",timerange="24h0m0s"} 30
+pdcollector_incidents_service_status_amount{id="P5VMHYN",service="redis",status="triggered",team="infra",timerange="24h0m0s"} 11
+# HELP pdcollector_scrape_age_seconds How long ago the last scraped occurred
+# TYPE pdcollector_scrape_age_seconds gauge
+pdcollector_scrape_age_seconds 15.9629924
 ```
 
 ## Docker images

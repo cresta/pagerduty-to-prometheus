@@ -16,17 +16,21 @@ func TestPdScrape(t *testing.T) {
 		t.Skipf("Skipping test because pd token not set in env PAGERDUTY_TOKEN")
 	}
 	x := PdScrape{
-		Log: testhelp.ZapTestingLogger(t),
+		Log:              testhelp.ZapTestingLogger(t),
+		LookbackDuration: time.Hour,
 	}
 	ctx := context.Background()
 	require.NoError(t, x.Init(ctx, os.Getenv("PAGERDUTY_TOKEN")))
 	require.NoError(t, x.Scrape(ctx))
-	av, err := x.Availabilities(ctx, time.Hour*24)
+	av, err := x.Availabilities(ctx, time.Hour*1)
 	require.NoError(t, err)
 	x.Log.Warn(ctx, "avails are ", zap.Any("av", av))
-	ic, err := x.IncidentCounts(ctx, time.Hour*24)
+	ic, err := x.IncidentCounts(ctx, time.Hour*1)
 	require.NoError(t, err)
 	x.Log.Warn(ctx, "counts are", zap.Any("ic", ic))
+	ic2, err := x.IncidentCountsByEscalationTeam(ctx, time.Hour*1)
+	require.NoError(t, err)
+	x.Log.Warn(ctx, "second counts are", zap.Any("ic2", ic2))
 }
 
 func TestTimeRange(t *testing.T) {
