@@ -57,6 +57,8 @@ github.com/cresta/httpsimple v0.0.1 h1:UzJdlYtoK7IHvWnaVtZeUdxJ+VuvFE4ZKggPr7V03
 github.com/cresta/httpsimple v0.0.1/go.mod h1:KG3YDW/9yrz2QEn17KNOW8nXpcDt6XEzG/UbG36eO+Y=
 github.com/cresta/magehelper v0.0.45 h1:BweYH69wctelPycz8iOhW1IZxJhCuDksBtUZKoS/nM4=
 github.com/cresta/magehelper v0.0.45/go.mod h1:TmMm/+5zVvQSz3q4ybBklELOMxt7SgEu/54i02o1Xn4=
+github.com/cresta/magehelper v0.0.51 h1:0MVhdD2JlR8hRqS8hukvFvRxSyoTdIgp5RSyfrOA72Q=
+github.com/cresta/magehelper v0.0.51/go.mod h1:TmMm/+5zVvQSz3q4ybBklELOMxt7SgEu/54i02o1Xn4=
 github.com/cresta/zapctx v0.0.0-20201224012231-232a208a375a/go.mod h1:yEbJOUfv1GOyN4UeU62bHJ83LCcxpZabkatSJ2Qpx+U=
 github.com/cresta/zapctx v0.0.1 h1:bwrQGBta0bf7u+AOWf6Sm9054iAxpuoVT/PfJC7DQn4=
 github.com/cresta/zapctx v0.0.1/go.mod h1:yEbJOUfv1GOyN4UeU62bHJ83LCcxpZabkatSJ2Qpx+U=
