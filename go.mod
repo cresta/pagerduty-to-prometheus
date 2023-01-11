@@ -5,8 +5,8 @@ go 1.16
 require (
 	github.com/PagerDuty/go-pagerduty v1.4.1
 	github.com/cresta/gotracing v0.0.3
-	github.com/cresta/httpsimple v0.0.1
-	github.com/cresta/magehelper v0.0.51
+	github.com/cresta/httpsimple v0.0.2
+	github.com/cresta/magehelper v0.0.56
 	github.com/cresta/zapctx v0.0.1
 	github.com/gorilla/mux v1.8.0
 	github.com/prometheus/client_golang v1.10.0
