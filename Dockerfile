@@ -1,4 +1,4 @@
-FROM golang:1.16.0-buster AS builder
+FROM golang:1.19.5-buster AS builder
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
